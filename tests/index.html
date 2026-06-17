@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>EcoCarbonFootprint – Test Suite</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      background: #0f172a;
+      color: #e2e8f0;
+      padding: 2rem;
+      min-height: 100vh;
+    }
+
+    header {
+      margin-bottom: 2rem;
+      border-bottom: 1px solid #1e293b;
+      padding-bottom: 1.5rem;
+    }
+
+    header h1 {
+      font-size: 1.75rem;
+      font-weight: 700;
+      color: #38bdf8;
+      margin-bottom: 0.25rem;
+    }
+
+    header p {
+      color: #94a3b8;
+      font-size: 0.9rem;
+    }
+
+    #summary {
+      display: flex;
+      gap: 1rem;
+      margin-bottom: 2rem;
+      flex-wrap: wrap;
+    }
+
+    .summary-card {
+      background: #1e293b;
+      border-radius: 8px;
+      padding: 1rem 1.5rem;
+      min-width: 140px;
+    }
+
+    .summary-card .value {
+      font-size: 2rem;
+      font-weight: 700;
+      line-height: 1;
+    }
+
+    .summary-card .label {
+      font-size: 0.8rem;
+      color: #94a3b8;
+      margin-top: 0.25rem;
+    }
+
+    .summary-card.pass  .value { color: #4ade80; }
+    .summary-card.fail  .value { color: #f87171; }
+    .summary-card.total .value { color: #38bdf8; }
+
+    #results {
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+
+    .test-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 0.75rem;
+      background: #1e293b;
+      border-radius: 6px;
+      padding: 0.75rem 1rem;
+      border-left: 4px solid transparent;
+    }
+
+    .test-item.pass { border-left-color: #4ade80; }
+    .test-item.fail { border-left-color: #f87171; }
+
+    .test-badge {
+      font-size: 0.75rem;
+      font-weight: 700;
+      padding: 2px 8px;
+      border-radius: 4px;
+      flex-shrink: 0;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .test-badge.pass { background: #166534; color: #4ade80; }
+    .test-badge.fail { background: #7f1d1d; color: #f87171; }
+
+    .test-name {
+      font-size: 0.9rem;
+      flex: 1;
+    }
+
+    .test-error {
+      font-size: 0.78rem;
+      color: #f87171;
+      margin-top: 0.25rem;
+      font-family: monospace;
+      background: #450a0a;
+      padding: 4px 8px;
+      border-radius: 4px;
+    }
+
+    .test-info {
+      flex-direction: column;
+    }
+
+    footer {
+      margin-top: 2rem;
+      color: #475569;
+      font-size: 0.8rem;
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <h1>EcoCarbonFootprint – Test Suite</h1>
+    <p>Browser-based unit tests for data.js and storage.js modules</p>
+  </header>
+
+  <div id="summary">
+    <div class="summary-card total">
+      <div class="value" id="count-total">–</div>
+      <div class="label">Total</div>
+    </div>
+    <div class="summary-card pass">
+      <div class="value" id="count-pass">–</div>
+      <div class="label">Passed</div>
+    </div>
+    <div class="summary-card fail">
+      <div class="value" id="count-fail">–</div>
+      <div class="label">Failed</div>
+    </div>
+  </div>
+
+  <div id="results"></div>
+
+  <footer>
+    <p>Open this file directly in a browser. No build tools required.</p>
+  </footer>
+
+  <!-- Hidden DOM stubs required by production modules -->
+  <div id="main-content" style="display:none;"></div>
+  <div id="bottom-nav" style="display:none;"></div>
+  <div id="top-header" style="display:none;"></div>
+  <div id="header-stat" style="display:none;"></div>
+
+  <!-- Prevent App.init() from running during tests -->
+  <script>window.__ECOTRACK_TEST_MODE__ = true;</script>
+
+  <!-- Production modules (load order matters) -->
+  <script src="../js/data.js"></script>
+  <script src="../js/storage.js"></script>
+  <script src="../js/quiz.js"></script>
+  <script src="../js/logger.js"></script>
+  <script src="../js/dashboard.js"></script>
+  <script src="../js/tips.js"></script>
+  <script src="../js/app.js"></script>
+
+  <!-- Test runner + tests -->
+  <script src="tests.js"></script>
+
+</body>
+</html>

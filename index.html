@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline';"
+    />
+    <title>EcoTrack — Understand, Track &amp; Reduce Your Carbon Footprint</title>
+    <meta name="description" content="Understand, track, and reduce your carbon footprint with personalized insights and actionable tips. Free, no sign-up needed." />
+    <meta name="theme-color" content="#1B5E3F">
+    <link rel="stylesheet" href="css/styles.css" />
+  </head>
+  <body>
+    <a class="skip-link" href="#main-content">Skip to main content</a>
+
+    <header id="top-header" class="top-header" hidden>
+      <div class="top-header-inner">
+        <a href="#dashboard" class="header-brand" aria-label="EcoTrack Home">
+            <span class="header-logo" aria-hidden="true">🌿</span>
+            <span class="header-name">EcoTrack</span>
+        </a>
+        <nav class="desktop-nav" aria-label="Desktop navigation">
+          <button class="desktop-nav-btn" data-route="dashboard" type="button">Dashboard</button>
+          <button class="desktop-nav-btn" data-route="log" type="button">Log</button>
+          <button class="desktop-nav-btn" data-route="tips" type="button">Tips</button>
+          <button class="desktop-nav-btn" data-route="profile" type="button">Profile</button>
+        </nav>
+        <div class="header-stat" id="header-stat" aria-live="polite"></div>
+      </div>
+    </header>
+
+    <main id="main-content" role="main" aria-live="polite"></main>
+
+    <nav id="bottom-nav" class="bottom-nav hidden" aria-label="Main navigation">
+      <button
+        class="nav-btn"
+        data-route="dashboard"
+        aria-label="Dashboard"
+        type="button"
+      >
+        <svg
+          aria-hidden="true"
+          focusable="false"
+          width="24"
+          height="24"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        >
+          <rect x="3" y="3" width="7" height="7" />
+          <rect x="14" y="3" width="7" height="7" />
+          <rect x="14" y="14" width="7" height="7" />
+          <rect x="3" y="14" width="7" height="7" />
+        </svg>
+        <span>Dashboard</span>
+      </button>
+
+      <button
+        class="nav-btn"
+        data-route="log"
+        aria-label="Log activity"
+        type="button"
+      >
+        <svg
+          aria-hidden="true"
+          focusable="false"
+          width="24"
+          height="24"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        >
+          <line x1="12" y1="5" x2="12" y2="19" />
+          <line x1="5" y1="12" x2="19" y2="12" />
+        </svg>
+        <span>Log</span>
+      </button>
+
+      <button
+        class="nav-btn"
+        data-route="tips"
+        aria-label="Eco tips"
+        type="button"
+      >
+        <svg
+          aria-hidden="true"
+          focusable="false"
+          width="24"
+          height="24"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        >
+          <circle cx="12" cy="12" r="10" />
+          <line x1="12" y1="8" x2="12" y2="12" />
+          <line x1="12" y1="16" x2="12.01" y2="16" />
+        </svg>
+        <span>Tips</span>
+      </button>
+
+      <button
+        class="nav-btn"
+        data-route="profile"
+        aria-label="User profile"
+        type="button"
+      >
+        <svg
+          aria-hidden="true"
+          focusable="false"
+          width="24"
+          height="24"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        >
+          <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+          <circle cx="12" cy="7" r="4" />
+        </svg>
+        <span>Profile</span>
+      </button>
+    </nav>
+
+    <script src="js/data.js"></script>
+    <script src="js/storage.js"></script>
+    <script src="js/quiz.js"></script>
+    <script src="js/logger.js"></script>
+    <script src="js/dashboard.js"></script>
+    <script src="js/tips.js"></script>
+    <script src="js/app.js"></script>
+  </body>
+</html>
