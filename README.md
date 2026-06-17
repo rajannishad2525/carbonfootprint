@@ -107,13 +107,13 @@ Each JavaScript module has a single, clear responsibility:
 
 | Module | Lines | Responsibility |
 |--------|-------|---------------|
-| `data.js` | 432 | Centralized emission factors, tips data, badges, calculation functions |
-| `storage.js` | 197 | LocalStorage CRUD, sanitization, validation, export/import |
-| `quiz.js` | 454 | 5-step onboarding flow with real-time estimation |
-| `logger.js` | 375 | Activity logging with custom dropdowns and unit hints |
-| `dashboard.js` | 210 | Analytics, charts, comparisons |
-| `tips.js` | 213 | Scoring engine and personalized recommendations |
-| `app.js` | 460 | SPA router, profile management, PDF export, badges |
+| `data.js` | 553 | Centralized emission factors, tips data, badges, shared SVG ring utility |
+| `storage.js` | 268 | LocalStorage CRUD, sanitization, validation, export/import |
+| `quiz.js` | 503 | 5-step onboarding flow with real-time estimation |
+| `logger.js` | 433 | Activity logging with custom dropdowns and unit hints |
+| `dashboard.js` | 270 | Analytics, charts, comparisons |
+| `tips.js` | 220 | Scoring engine and personalized recommendations |
+| `app.js` | 615 | SPA router, profile management, PDF export, badges |
 
 ### Code Principles
 - **DRY** — reusable components (custom dropdown, modal, toast, SVG rings)
@@ -155,7 +155,7 @@ carbonfootprint/
 2. Open `index.html` in any modern web browser
 3. No build step, no server, no installation required
 
-**To run tests:** Open `tests/index.html` in a browser — all 38 tests run automatically.
+**To run tests:** Open `tests/index.html` in a browser — all 42 tests run automatically.
 
 **Live version:** [https://eco.ystro.shop](https://eco.ystro.shop)
 
@@ -204,7 +204,7 @@ carbonfootprint/
 
 ## Testing
 
-- **38 unit tests** covering:
+- **42 unit tests** covering:
   - Emission factor validation (positive values, zero for bike/walk)
   - Source citation presence on all factors
   - `calculateEmission()` accuracy (car: 10km = 1.74 kg CO2)

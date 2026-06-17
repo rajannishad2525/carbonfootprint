@@ -1,10 +1,14 @@
-// Quiz: 5-step onboarding quiz for collecting user lifestyle data and calculating CO2 baseline
+/**
+ * Quiz: 5-step onboarding quiz for collecting user lifestyle data and calculating CO2 baseline.
+ * Each step collects category-specific data with real-time footprint estimation.
+ * @namespace
+ */
 const Quiz = {
 
-  // Tracks the currently visible quiz step index (0-based)
+  /** Tracks the currently visible quiz step index (0-based) */
   currentStep: 0,
 
-  // Default answers for all quiz categories, used as initial state and reset target
+  /** Default answers for all quiz categories, used as initial state and reset target */
   answers: {
     transport: { mode: 'car', dailyKm: 10 },
     food: { dietType: 'mixed' },
@@ -13,7 +17,10 @@ const Quiz = {
     lifestyle: { flightsPerYear: 1, intlFlightsPerYear: 0 }
   },
 
-  // Ordered array of step definitions describing each quiz page's fields
+  /** Maximum footprint value used for ring normalization (tonnes CO2) */
+  MAX_RING_FOOTPRINT: 10,
+
+  /** Ordered array of step definitions describing each quiz page's fields */
   steps: [
     {
       key: 'transport',
@@ -129,7 +136,10 @@ const Quiz = {
     }
   ],
 
-  // Flattens nested answers into the flat structure expected by EcoData.calculateBaselineFootprint
+  /**
+   * Flattens nested answers into the flat structure expected by EcoData.calculateBaselineFootprint.
+   * @returns {Object} Flat quiz answers object
+   */
   _flattenAnswers: function() {
     return {
       transport: this.answers.transport.mode,
@@ -144,9 +154,11 @@ const Quiz = {
     };
   },
 
-  // Renders the welcome splash screen and wires the Get Started button
+  /**
+   * Renders the welcome splash screen and wires the Get Started button.
+   */
   renderWelcome: function() {
-    var main = document.getElementById('main-content');
+    const main = document.getElementById('main-content');
     main.innerHTML = '<section class="screen-welcome" aria-label="Welcome to EcoTrack">'
       + '<div class="welcome-logo" aria-hidden="true">🌿</div>'
       + '<h1 class="welcome-title">EcoTrack</h1>'
@@ -161,31 +173,53 @@ const Quiz = {
     });
   },
 
-  // Renders the current quiz step with progress bar, fields, CO2 estimate, and navigation buttons
-  render: function() {
-    var main = document.getElementById('main-content');
-    var step = this.steps[this.currentStep];
-    var total = this.steps.length;
-    var progressPct = Math.round(((this.currentStep + 1) / total) * 100);
-    var estimate = EcoData.calculateBaselineFootprint(this._flattenAnswers());
+  /**
+   * Returns the comparison text for a given footprint estimate.
+   * @param {number} estimate - Estimated annual footprint in tonnes CO2
+   * @returns {string} Comparison string with emoji indicator
+   */
+  _getComparisonText: function(estimate) {
+    const thresholds = EcoData.FOOTPRINT_THRESHOLDS;
+    if (estimate <= thresholds.INDIA_AVG) return '✅ Below India avg (' + thresholds.INDIA_AVG + 't)';
+    if (estimate <= thresholds.GLOBAL_AVG) return '⚠️ Above India avg (' + thresholds.INDIA_AVG + 't)';
+    return '🔴 Above global avg (' + thresholds.GLOBAL_AVG + 't)';
+  },
 
-    var fieldsHTML = step.fields.map(function(field) {
+  /**
+   * Renders the current quiz step with progress bar, fields, CO2 estimate, and navigation buttons.
+   */
+  render: function() {
+    const main = document.getElementById('main-content');
+    const step = this.steps[this.currentStep];
+    const total = this.steps.length;
+    const progressPct = Math.round(((this.currentStep + 1) / total) * 100);
+    const estimate = EcoData.calculateBaselineFootprint(this._flattenAnswers());
+
+    const fieldsHTML = step.fields.map(function(field) {
       return Quiz.renderField(field, step.key);
     }).join('');
 
-    var backBtn = '';
+    let backBtn = '';
     if (this.currentStep > 0) {
       backBtn = '<button class="btn btn-outline" id="btn-back" type="button"'
         + ' aria-label="Go back to previous step">Back</button>';
     }
 
-    var nextLabel = this.currentStep === total - 1 ? 'See Results' : 'Next';
-    var nextBtn = '<button class="btn btn-primary" id="btn-next" type="button"'
-      + ' aria-label="' + (this.currentStep === total - 1 ? 'Finish quiz and see results' : 'Go to next step') + '">'
-      + nextLabel + '</button>';
+    const nextLabel = this.currentStep === total - 1 ? 'See Results' : 'Next';
+    const nextAriaLabel = this.currentStep === total - 1 ? 'Finish quiz and see results' : 'Go to next step';
+    const nextBtn = '<button class="btn btn-primary" id="btn-next" type="button"'
+      + ' aria-label="' + nextAriaLabel + '">' + nextLabel + '</button>';
 
-    // Determine estimate color based on value
-    var estimateColor = estimate <= 1.9 ? 'var(--color-success)' : estimate <= 4.7 ? 'var(--color-warning)' : 'var(--color-danger)';
+    const estimateColor = EcoData.getFootprintColor(estimate);
+    const ringRatio = Math.min(estimate / this.MAX_RING_FOOTPRINT, 1);
+
+    const ringHTML = EcoData.buildSVGRing({
+      radius: 42, strokeWidth: 6, ratio: ringRatio, stroke: estimateColor,
+      trackStroke: '#eee', size: 100,
+      ariaLabel: estimate + ' tonnes CO2 per year',
+      centerText: '' + estimate, subText: 'tonnes CO₂/yr',
+      fontSize: 18, subFontSize: 9
+    });
 
     main.innerHTML = '<section class="quiz-container" aria-label="Onboarding quiz">'
 
@@ -218,18 +252,9 @@ const Quiz = {
       + '<div class="quiz-estimate-card card" aria-live="polite">'
       + '<div class="quiz-estimate-icon" aria-hidden="true">🌍</div>'
       + '<p class="quiz-estimate-label">Your estimated footprint</p>'
-      + '<div class="quiz-estimate-ring">'
-      + '<svg viewBox="0 0 100 100" width="90" height="90" role="img" aria-label="' + estimate + ' tonnes CO2 per year">'
-      + '<circle cx="50" cy="50" r="42" fill="none" stroke="#eee" stroke-width="6"/>'
-      + '<circle cx="50" cy="50" r="42" fill="none" stroke="' + estimateColor + '"'
-      + ' stroke-width="6" stroke-dasharray="' + Math.min(estimate / 10, 1) * 264 + ' 264"'
-      + ' stroke-linecap="round" transform="rotate(-90 50 50)"/>'
-      + '<text x="50" y="46" text-anchor="middle" font-size="18" font-weight="bold" fill="var(--color-text)">' + estimate + '</text>'
-      + '<text x="50" y="62" text-anchor="middle" font-size="9" fill="var(--color-neutral)">tonnes CO₂/yr</text>'
-      + '</svg>'
-      + '</div>'
+      + '<div class="quiz-estimate-ring">' + ringHTML + '</div>'
       + '<p class="quiz-estimate-compare" id="quiz-estimate-value">'
-      + (estimate <= 1.9 ? '✅ Below India avg (1.9t)' : estimate <= 4.7 ? '⚠️ Above India avg (1.9t)' : '🔴 Above global avg (4.7t)')
+      + this._getComparisonText(estimate)
       + '</p>'
       + '</div>'
 
@@ -266,16 +291,21 @@ const Quiz = {
     });
   },
 
-  // Returns HTML string for a single form field (select or number) pre-filled with current answer
+  /**
+   * Returns HTML string for a single form field (select or number) pre-filled with current answer.
+   * @param {Object} field - Field definition object
+   * @param {string} stepKey - The step's category key
+   * @returns {string} HTML string for the form field
+   */
   renderField: function(field, stepKey) {
-    var fieldId = 'quiz-field-' + stepKey + '-' + field.name;
-    var currentVal = this.answers[stepKey][field.name];
+    const fieldId = 'quiz-field-' + stepKey + '-' + field.name;
+    const currentVal = this.answers[stepKey][field.name];
 
     if (field.type === 'select') {
-      var options = field.options();
-      var currentLabel = '';
-      var opts = options.map(function(opt) {
-        var active = opt.value === currentVal ? ' active' : '';
+      const options = field.options();
+      let currentLabel = '';
+      const opts = options.map(function(opt) {
+        const active = opt.value === currentVal ? ' active' : '';
         if (opt.value === currentVal) currentLabel = opt.label;
         return '<div class="csel-option' + active + '" data-value="' + opt.value + '"'
           + ' role="option" tabindex="0">' + opt.label + '</div>';
@@ -307,10 +337,13 @@ const Quiz = {
       + '</div>';
   },
 
-  // Attaches input/change listeners to all fields in the current step for real-time updates
+  /**
+   * Attaches input/change listeners to all fields in the current step for real-time updates.
+   * @param {Object} step - The current step definition object
+   */
   _bindFieldEvents: function(step) {
     // Bind number inputs
-    var inputs = document.querySelectorAll('input[data-step-key="' + step.key + '"]');
+    const inputs = document.querySelectorAll('input[data-step-key="' + step.key + '"]');
     inputs.forEach(function(el) {
       el.addEventListener('input', function() {
         Quiz.updateAnswer(el.getAttribute('data-step-key'), el.getAttribute('data-field-name'), parseFloat(el.value) || 0);
@@ -318,16 +351,15 @@ const Quiz = {
     });
 
     // Bind custom dropdowns
-    var csels = document.querySelectorAll('.csel[data-step-key="' + step.key + '"]');
+    const csels = document.querySelectorAll('.csel[data-step-key="' + step.key + '"]');
     csels.forEach(function(csel) {
-      var trigger = csel.querySelector('.csel-trigger');
-      var dropdown = csel.querySelector('.csel-dropdown');
+      const trigger = csel.querySelector('.csel-trigger');
+      const dropdown = csel.querySelector('.csel-dropdown');
 
       // Toggle dropdown
       trigger.addEventListener('click', function(e) {
         e.stopPropagation();
-        var isOpen = csel.classList.contains('open');
-        // Close all others first
+        const isOpen = csel.classList.contains('open');
         document.querySelectorAll('.csel.open').forEach(function(c) { c.classList.remove('open'); });
         if (!isOpen) csel.classList.add('open');
         trigger.setAttribute('aria-expanded', !isOpen);
@@ -335,9 +367,9 @@ const Quiz = {
 
       // Select option
       dropdown.addEventListener('click', function(e) {
-        var opt = e.target.closest('.csel-option');
+        const opt = e.target.closest('.csel-option');
         if (!opt) return;
-        var val = opt.getAttribute('data-value');
+        const val = opt.getAttribute('data-value');
         csel.querySelector('.csel-value').textContent = opt.textContent;
         dropdown.querySelectorAll('.csel-option').forEach(function(o) { o.classList.remove('active'); });
         opt.classList.add('active');
@@ -350,7 +382,7 @@ const Quiz = {
       dropdown.addEventListener('keydown', function(e) {
         if (e.key === 'Enter' || e.key === ' ') {
           e.preventDefault();
-          var focused = document.activeElement;
+          const focused = document.activeElement;
           if (focused && focused.classList.contains('csel-option')) focused.click();
         } else if (e.key === 'Escape') {
           csel.classList.remove('open');
@@ -368,39 +400,47 @@ const Quiz = {
     });
   },
 
-  // Updates a specific answer field and refreshes the live CO2 estimate display
+  /**
+   * Updates a specific answer field and refreshes the live CO2 estimate display.
+   * @param {string} stepKey - The step's category key
+   * @param {string} fieldName - The field name within the step
+   * @param {*} value - The new value for the field
+   */
   updateAnswer: function(stepKey, fieldName, value) {
     this.answers[stepKey][fieldName] = value;
-    var estimate = EcoData.calculateBaselineFootprint(this._flattenAnswers());
+    const estimate = EcoData.calculateBaselineFootprint(this._flattenAnswers());
 
     // Update ring SVG text
-    var ringTexts = document.querySelectorAll('.quiz-estimate-ring text');
+    const ringTexts = document.querySelectorAll('.quiz-estimate-ring text');
     if (ringTexts.length >= 1) ringTexts[0].textContent = estimate;
 
-    // Update ring stroke
-    var ringCircle = document.querySelectorAll('.quiz-estimate-ring circle');
+    // Update ring stroke color and dash
+    const ringCircle = document.querySelectorAll('.quiz-estimate-ring circle');
     if (ringCircle.length >= 2) {
-      var color = estimate <= 1.9 ? 'var(--color-success)' : estimate <= 4.7 ? 'var(--color-warning)' : 'var(--color-danger)';
+      const color = EcoData.getFootprintColor(estimate);
+      const circumference = EcoData.SVG_RING.QUIZ_CIRCUMFERENCE;
       ringCircle[1].setAttribute('stroke', color);
-      ringCircle[1].setAttribute('stroke-dasharray', Math.min(estimate / 10, 1) * 264 + ' 264');
+      ringCircle[1].setAttribute('stroke-dasharray', Math.min(estimate / this.MAX_RING_FOOTPRINT, 1) * circumference + ' ' + circumference);
     }
 
     // Update comparison text
-    var el = document.getElementById('quiz-estimate-value');
+    const el = document.getElementById('quiz-estimate-value');
     if (el) {
-      el.textContent = estimate <= 1.9 ? '✅ Below India avg (1.9t)' : estimate <= 4.7 ? '⚠️ Above India avg (1.9t)' : '🔴 Above global avg (4.7t)';
+      el.textContent = this._getComparisonText(estimate);
     }
   },
 
-  // Saves quiz results; asks name only on first run, skips name modal on retake
+  /**
+   * Saves quiz results; asks name only on first run, skips name modal on retake.
+   */
   finishQuiz: function() {
-    var baseline = EcoData.calculateBaselineFootprint(this._flattenAnswers());
-    var flatAnswers = this._flattenAnswers();
-    var existingProfile = EcoStorage.getProfile();
+    const baseline = EcoData.calculateBaselineFootprint(this._flattenAnswers());
+    const flatAnswers = this._flattenAnswers();
+    const existingProfile = EcoStorage.getProfile();
 
     // If retaking quiz, keep existing name and just update answers
     if (existingProfile && existingProfile.name) {
-      var updated = Object.assign({}, existingProfile, {
+      const updated = Object.assign({}, existingProfile, {
         quizAnswers: flatAnswers,
         baselineFootprint: baseline,
         updatedAt: new Date().toISOString()
@@ -411,8 +451,17 @@ const Quiz = {
       return;
     }
 
-    // First time — ask for name
-    var overlay = document.createElement('div');
+    // First time — ask for name via modal
+    Quiz._showNameModal(flatAnswers, baseline);
+  },
+
+  /**
+   * Displays the name input modal for first-time quiz completion.
+   * @param {Object} flatAnswers - Flattened quiz answers
+   * @param {number} baseline - Calculated baseline footprint in tonnes CO2
+   */
+  _showNameModal: function(flatAnswers, baseline) {
+    const overlay = document.createElement('div');
     overlay.className = 'modal-overlay';
     overlay.innerHTML = '<div class="modal-card">'
       + '<div class="modal-icon" aria-hidden="true">🌿</div>'
@@ -430,7 +479,7 @@ const Quiz = {
     setTimeout(function() { document.getElementById('modal-name-input').focus(); }, 50);
 
     function saveAndGo(name) {
-      var profile = {
+      const profile = {
         name: name || 'Eco Warrior',
         quizAnswers: flatAnswers,
         baselineFootprint: baseline,

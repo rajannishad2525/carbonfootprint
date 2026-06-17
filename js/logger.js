@@ -1,7 +1,16 @@
-// Logger: Activity logging screen with form, today's log, and recent history
+/**
+ * Logger: Activity logging screen with form, today's log, and recent history.
+ * Provides custom dropdowns, dynamic unit hints, and CO2 preview.
+ * @namespace
+ */
 const Logger = {
 
-  // Renders the full activity logger screen including form, today's log, and recent days
+  /** Number of recent days to display in history section */
+  RECENT_DAYS_COUNT: 6,
+
+  /**
+   * Renders the full activity logger screen including form, today's log, and recent days.
+   */
   render() {
     const main = document.getElementById('main-content');
     const todayStr = new Date().toISOString().slice(0, 10);
@@ -14,56 +23,72 @@ const Logger = {
     const firstActivityKey = Object.keys(firstActivities)[0];
     const firstFactor = firstActivities[firstActivityKey];
 
-    // Build category options as array of {value, label}
     const categoryOptions = Object.keys(EcoData.emissionFactors).map(function(cat) {
       return { value: cat, label: EcoData.categoryIcons[cat] + ' ' + EcoData.categoryLabels[cat] };
     });
 
-    // Build initial activity options
     const activityOptions = Object.keys(firstActivities).map(function(actKey) {
       return { value: actKey, label: firstActivities[actKey].label };
     });
 
-    // Build today's log items or empty state
     const todayItemsHTML = todayLogs.length > 0
       ? todayLogs.map(function(log) { return Logger.renderLogItem(log); }).join('')
       : '<p class="text-muted" style="padding:12px 0;">No activities logged today.</p>';
 
-    // Build recent days section
     const recentHTML = Logger.renderRecentDays(allLogs, todayStr);
 
     main.innerHTML = '<div class="screen-logger" aria-label="Activity logger">'
-
       + '<h1 class="screen-title">Log Activity</h1>'
+      + Logger._buildHeroHTML(todayTotal, todayLogs.length)
+      + Logger._buildFormHTML(categoryOptions, firstCategory, activityOptions, firstActivityKey, firstFactor)
+      + Logger._buildTodayLogHTML(todayTotal, todayItemsHTML)
+      + (recentHTML ? '<div class="card mt-16"><h2 class="card-title">Recent Days</h2>' + recentHTML + '</div>' : '')
+      + '</div>';
 
-      // Today's summary hero
-      + '<div class="log-hero">'
+    Logger._bindFormEvents(main);
+  },
+
+  /**
+   * Builds the hero summary section HTML.
+   * @param {number} todayTotal - Total CO2 logged today in kg
+   * @param {number} entryCount - Number of entries logged today
+   * @returns {string} HTML string for the hero section
+   */
+  _buildHeroHTML(todayTotal, entryCount) {
+    return '<div class="log-hero">'
       + '<div class="log-hero-left">'
       + '<span class="log-hero-value">' + todayTotal.toFixed(1) + '</span>'
       + '<span class="log-hero-unit">kg CO\u2082 today</span>'
       + '</div>'
       + '<div class="log-hero-right">'
-      + '<span class="log-hero-count">' + todayLogs.length + '</span>'
+      + '<span class="log-hero-count">' + entryCount + '</span>'
       + '<span class="log-hero-unit">entries</span>'
       + '</div>'
-      + '</div>'
+      + '</div>';
+  },
 
-      // Log form card
-      + '<div class="card mt-16">'
+  /**
+   * Builds the new entry form card HTML.
+   * @param {Array} categoryOptions - Category dropdown options
+   * @param {string} firstCategory - Initially selected category key
+   * @param {Array} activityOptions - Activity dropdown options
+   * @param {string} firstActivityKey - Initially selected activity key
+   * @param {Object} firstFactor - Emission factor object for the initial activity
+   * @returns {string} HTML string for the form card
+   */
+  _buildFormHTML(categoryOptions, firstCategory, activityOptions, firstActivityKey, firstFactor) {
+    return '<div class="card mt-16">'
       + '<h2 class="card-title">New Entry</h2>'
-
       + '<div class="log-form-grid">'
       + '<div class="form-group">'
       + '<label class="form-label">Category</label>'
       + Logger.buildCustomSelect('log-category', categoryOptions, firstCategory, 'Select category')
       + '</div>'
-
       + '<div class="form-group">'
       + '<label class="form-label">Activity</label>'
       + Logger.buildCustomSelect('log-activity', activityOptions, firstActivityKey, 'Select activity')
       + '</div>'
       + '</div>'
-
       + '<div class="form-group">'
       + '<label class="form-label" for="log-quantity">Quantity <span id="log-unit-badge" class="log-unit-badge">'
       + Logger.getUnitLabel(firstFactor.unit) + '</span></label>'
@@ -72,51 +97,48 @@ const Logger = {
       + ' aria-label="Enter quantity" placeholder="e.g. 10"/>'
       + '<span class="log-qty-suffix" id="log-unit-suffix">' + Logger.getUnitShort(firstFactor.unit) + '</span>'
       + '</div>'
-      + '<p id="log-unit-hint" class="log-unit-hint">'
-      + Logger.getUnitHelp(firstFactor.unit) + '</p>'
+      + '<p id="log-unit-hint" class="log-unit-hint">' + Logger.getUnitHelp(firstFactor.unit) + '</p>'
       + '</div>'
-
       + '<div class="log-preview-card" aria-live="polite" id="log-preview">'
       + '<p class="text-muted">Enter a quantity to see CO\u2082 estimate</p>'
       + '</div>'
-
       + '<button id="btn-add-entry" class="btn btn-accent btn-block mt-16" type="button"'
       + ' aria-label="Add activity entry">Add Entry</button>'
+      + '</div>';
+  },
 
-      + '</div>'
-
-      // Today's log
-      + '<div class="card mt-16">'
+  /**
+   * Builds the today's log section HTML.
+   * @param {number} todayTotal - Total CO2 logged today in kg
+   * @param {string} todayItemsHTML - Pre-rendered log items HTML
+   * @returns {string} HTML string for today's log section
+   */
+  _buildTodayLogHTML(todayTotal, todayItemsHTML) {
+    return '<div class="card mt-16">'
       + '<div class="log-section-header">'
       + '<h2 class="card-title" style="margin-bottom:0;">Today\'s Log</h2>'
-      + '<span class="badge-co2">'
-      + todayTotal.toFixed(2) + ' kg CO\u2082'
-      + '</span>'
+      + '<span class="badge-co2">' + todayTotal.toFixed(2) + ' kg CO\u2082</span>'
       + '</div>'
-      + '<div role="list" id="today-log-list">'
-      + todayItemsHTML
-      + '</div>'
-      + '</div>'
-
-      + (recentHTML ? '<div class="card mt-16"><h2 class="card-title">Recent Days</h2>' + recentHTML + '</div>' : '')
-
+      + '<div role="list" id="today-log-list">' + todayItemsHTML + '</div>'
       + '</div>';
+  },
 
-    // Bind custom dropdowns
+  /**
+   * Binds all event listeners for the logger form.
+   * @param {HTMLElement} main - The main content container element
+   */
+  _bindFormEvents(main) {
     Logger.bindCustomSelect('log-category', function() { Logger.updateActivities(); });
     Logger.bindCustomSelect('log-activity', function() { Logger.updatePreview(); });
 
-    // Quantity input → update CO2 preview
     document.getElementById('log-quantity').addEventListener('input', function() {
       Logger.updatePreview();
     });
 
-    // Add entry button
     document.getElementById('btn-add-entry').addEventListener('click', function() {
       Logger.addEntry();
     });
 
-    // Close dropdowns on outside click
     document.addEventListener('click', function() {
       document.querySelectorAll('.csel.open').forEach(function(c) {
         c.classList.remove('open');
@@ -124,7 +146,6 @@ const Logger = {
       });
     });
 
-    // Delegated delete handler on main content
     main.addEventListener('click', function(e) {
       const deleteBtn = e.target.closest('.log-delete-btn');
       if (!deleteBtn) return;
@@ -144,25 +165,26 @@ const Logger = {
     });
   },
 
-  // Repopulates the activity dropdown based on the currently selected category
+  /**
+   * Repopulates the activity dropdown based on the currently selected category.
+   */
   updateActivities() {
-    var catCsel = document.getElementById('log-category');
+    const catCsel = document.getElementById('log-category');
     if (!catCsel) return;
-    var category = catCsel.getAttribute('data-value');
-    var activities = EcoData.emissionFactors[category];
+    const category = catCsel.getAttribute('data-value');
+    const activities = EcoData.emissionFactors[category];
     if (!activities) return;
 
-    var actKeys = Object.keys(activities);
-    var firstKey = actKeys[0];
-    var options = actKeys.map(function(k) {
+    const actKeys = Object.keys(activities);
+    const firstKey = actKeys[0];
+    const options = actKeys.map(function(k) {
       return { value: k, label: activities[k].label };
     });
 
-    // Rebuild activity dropdown
-    var actWrap = document.getElementById('log-activity');
+    const actWrap = document.getElementById('log-activity');
     if (actWrap) {
-      var newHTML = Logger.buildCustomSelect('log-activity', options, firstKey, 'Select activity');
-      var temp = document.createElement('div');
+      const newHTML = Logger.buildCustomSelect('log-activity', options, firstKey, 'Select activity');
+      const temp = document.createElement('div');
       temp.innerHTML = newHTML;
       actWrap.parentNode.replaceChild(temp.firstChild, actWrap);
       Logger.bindCustomSelect('log-activity', function() { Logger.updatePreview(); });
@@ -171,23 +193,25 @@ const Logger = {
     Logger.updatePreview();
   },
 
-  // Reads current selections and quantity, then updates the live CO2 preview and unit hint
+  /**
+   * Reads current selections and quantity, then updates the live CO2 preview and unit hint.
+   */
   updatePreview() {
-    var categoryEl = document.getElementById('log-category');
-    var activityEl = document.getElementById('log-activity');
-    var quantityEl = document.getElementById('log-quantity');
-    var previewEl = document.getElementById('log-preview');
-    var unitHintEl = document.getElementById('log-unit-hint');
+    const categoryEl = document.getElementById('log-category');
+    const activityEl = document.getElementById('log-activity');
+    const quantityEl = document.getElementById('log-quantity');
+    const previewEl = document.getElementById('log-preview');
+    const unitHintEl = document.getElementById('log-unit-hint');
     if (!categoryEl || !activityEl || !quantityEl || !previewEl) return;
 
-    var category = categoryEl.getAttribute('data-value');
-    var activity = activityEl.getAttribute('data-value');
-    var quantity = parseFloat(quantityEl.value) || 0;
+    const category = categoryEl.getAttribute('data-value');
+    const activity = activityEl.getAttribute('data-value');
+    const quantity = parseFloat(quantityEl.value) || 0;
 
     const factor = EcoData.emissionFactors[category] && EcoData.emissionFactors[category][activity];
     if (factor) {
-      var badge = document.getElementById('log-unit-badge');
-      var suffix = document.getElementById('log-unit-suffix');
+      const badge = document.getElementById('log-unit-badge');
+      const suffix = document.getElementById('log-unit-suffix');
       if (unitHintEl) unitHintEl.textContent = Logger.getUnitHelp(factor.unit);
       if (badge) badge.textContent = Logger.getUnitLabel(factor.unit);
       if (suffix) suffix.textContent = Logger.getUnitShort(factor.unit);
@@ -203,16 +227,18 @@ const Logger = {
       + '<p class="log-preview-value">' + co2.toFixed(2) + ' kg CO\u2082</p>';
   },
 
-  // Validates input, calculates emission, saves the log entry, and re-renders the screen
+  /**
+   * Validates input, calculates emission, saves the log entry, and re-renders the screen.
+   */
   addEntry() {
-    var categoryEl = document.getElementById('log-category');
-    var activityEl = document.getElementById('log-activity');
-    var quantityEl = document.getElementById('log-quantity');
+    const categoryEl = document.getElementById('log-category');
+    const activityEl = document.getElementById('log-activity');
+    const quantityEl = document.getElementById('log-quantity');
     if (!categoryEl || !activityEl || !quantityEl) return;
 
-    var category = categoryEl.getAttribute('data-value');
-    var activity = activityEl.getAttribute('data-value');
-    var quantity = parseFloat(quantityEl.value);
+    const category = categoryEl.getAttribute('data-value');
+    const activity = activityEl.getAttribute('data-value');
+    const quantity = parseFloat(quantityEl.value);
 
     if (!quantity || quantity <= 0) {
       App.showToast('Please enter a quantity greater than 0.', 'error');
@@ -242,7 +268,11 @@ const Logger = {
     Logger.render();
   },
 
-  // Returns the HTML string for a single log entry row
+  /**
+   * Returns the HTML string for a single log entry row.
+   * @param {Object} log - Log entry object
+   * @returns {string} HTML string for the log item
+   */
   renderLogItem(log) {
     const icon = EcoData.categoryIcons[log.category] || '';
     const activities = EcoData.emissionFactors[log.category];
@@ -265,10 +295,15 @@ const Logger = {
       + '</div>';
   },
 
-  // Renders grouped log entries for the last 6 days excluding today, or returns empty string if none
+  /**
+   * Renders grouped log entries for the last N days excluding today.
+   * @param {Array} logs - All log entries
+   * @param {string} todayStr - Today's date string in YYYY-MM-DD format
+   * @returns {string} HTML string for the recent days section, or empty string
+   */
   renderRecentDays(logs, todayStr) {
     const days = [];
-    for (let i = 1; i <= 6; i++) {
+    for (let i = 1; i <= this.RECENT_DAYS_COUNT; i++) {
       const d = new Date(todayStr);
       d.setDate(d.getDate() - i);
       days.push(d.toISOString().slice(0, 10));
@@ -296,11 +331,18 @@ const Logger = {
     return html;
   },
 
-  // Builds HTML for a custom dropdown (reuses .csel styles from quiz)
+  /**
+   * Builds HTML for a custom dropdown (reuses .csel styles from quiz).
+   * @param {string} id - Element id for the dropdown
+   * @param {Array} options - Array of {value, label} option objects
+   * @param {string} activeValue - Currently selected value
+   * @param {string} ariaLabel - Accessible label
+   * @returns {string} HTML string for the custom select
+   */
   buildCustomSelect(id, options, activeValue, ariaLabel) {
-    var activeLabel = '';
-    var optsHTML = options.map(function(opt) {
-      var cls = opt.value === activeValue ? ' active' : '';
+    let activeLabel = '';
+    const optsHTML = options.map(function(opt) {
+      const cls = opt.value === activeValue ? ' active' : '';
       if (opt.value === activeValue) activeLabel = opt.label;
       return '<div class="csel-option' + cls + '" data-value="' + opt.value + '" role="option" tabindex="0">' + opt.label + '</div>';
     }).join('');
@@ -314,23 +356,27 @@ const Logger = {
       + '</div>';
   },
 
-  // Binds open/close and selection events on a custom dropdown
+  /**
+   * Binds open/close and selection events on a custom dropdown.
+   * @param {string} id - Element id of the custom select
+   * @param {Function} onChange - Callback invoked when a new option is selected
+   */
   bindCustomSelect(id, onChange) {
-    var csel = document.getElementById(id);
+    const csel = document.getElementById(id);
     if (!csel) return;
-    var trigger = csel.querySelector('.csel-trigger');
-    var dropdown = csel.querySelector('.csel-dropdown');
+    const trigger = csel.querySelector('.csel-trigger');
+    const dropdown = csel.querySelector('.csel-dropdown');
 
     trigger.addEventListener('click', function(e) {
       e.stopPropagation();
-      var isOpen = csel.classList.contains('open');
+      const isOpen = csel.classList.contains('open');
       document.querySelectorAll('.csel.open').forEach(function(c) { c.classList.remove('open'); });
       if (!isOpen) csel.classList.add('open');
       trigger.setAttribute('aria-expanded', !isOpen);
     });
 
     dropdown.addEventListener('click', function(e) {
-      var opt = e.target.closest('.csel-option');
+      const opt = e.target.closest('.csel-option');
       if (!opt) return;
       csel.setAttribute('data-value', opt.getAttribute('data-value'));
       csel.querySelector('.csel-value').textContent = opt.textContent;
@@ -342,27 +388,39 @@ const Logger = {
     });
   },
 
-  // Returns a user-friendly label for the unit (shown as badge)
+  /**
+   * Returns a user-friendly label for the unit (shown as badge).
+   * @param {string} unit - Raw unit string from emission factor
+   * @returns {string} Human-readable unit label
+   */
   getUnitLabel(unit) {
-    var map = {
+    const map = {
       'kgCO2/km': 'in km', 'kgCO2/day': 'in days', 'kgCO2/kWh': 'in kWh',
       'tonneCO2/year': 'in months', 'kgCO2/flight': 'flights', 'kgCO2/hour': 'in hours'
     };
     return map[unit] || unit;
   },
 
-  // Returns a short suffix shown inside the input
+  /**
+   * Returns a short suffix shown inside the input.
+   * @param {string} unit - Raw unit string from emission factor
+   * @returns {string} Short unit suffix
+   */
   getUnitShort(unit) {
-    var map = {
+    const map = {
       'kgCO2/km': 'km', 'kgCO2/day': 'days', 'kgCO2/kWh': 'kWh',
       'tonneCO2/year': 'months', 'kgCO2/flight': 'flights', 'kgCO2/hour': 'hours'
     };
     return map[unit] || '';
   },
 
-  // Returns a helpful example text for the user
+  /**
+   * Returns a helpful example text for the user.
+   * @param {string} unit - Raw unit string from emission factor
+   * @returns {string} Contextual help text for the unit
+   */
   getUnitHelp(unit) {
-    var map = {
+    const map = {
       'kgCO2/km': 'Enter distance travelled in kilometers (e.g. 15 km to office)',
       'kgCO2/day': 'Enter number of days with this diet (e.g. 1 for today)',
       'kgCO2/kWh': 'Enter electricity used in kWh (check your meter or bill)',

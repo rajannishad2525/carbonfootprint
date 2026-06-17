@@ -1,10 +1,29 @@
-// App: Global SPA router and profile/settings screen
+/**
+ * App: Global SPA router, profile/settings screen, eco score calculation,
+ * badge system, PDF report export, and UI utilities (modal, toast).
+ * @namespace
+ */
 const App = {
 
-  // Currently active route name
+  /** Currently active route name */
   currentRoute: '',
 
-  // Maps route names to their render functions
+  /** Toast notification display duration in milliseconds */
+  TOAST_DURATION: 2500,
+
+  /** Toast fade-out animation duration in milliseconds */
+  TOAST_FADE_MS: 300,
+
+  /** Eco score boundaries for footprint-to-score mapping */
+  ECO_SCORE: { MAX_SCORE: 100, MIN_SCORE: 5, LOW_FOOTPRINT: 0.5, HIGH_FOOTPRINT: 10 },
+
+  /** Badge thresholds for quiz-based badge checks (kg CO2/yr) */
+  BADGE_THRESHOLDS: { TRANSPORT: 500, FOOD: 800, ENERGY: 500 },
+
+  /** Routes that show the bottom navigation bar */
+  NAV_ROUTES: ['dashboard', 'log', 'tips', 'profile'],
+
+  /** Maps route names to their render functions */
   screens: {
     welcome:   function() { Quiz.renderWelcome(); },
     quiz:      function() { Quiz.render(); },
@@ -14,7 +33,9 @@ const App = {
     profile:   function() { App.renderProfile(); }
   },
 
-  // Bootstraps the app: wires events and directs to the correct initial route
+  /**
+   * Bootstraps the app: wires events and directs to the correct initial route.
+   */
   init() {
     window.addEventListener('hashchange', function() { App.route(); });
 
@@ -26,13 +47,12 @@ const App = {
       }
     });
 
-    // Desktop nav click handler
-    var desktopNav = document.querySelector('.desktop-nav');
+    const desktopNav = document.querySelector('.desktop-nav');
     if (desktopNav) {
       desktopNav.addEventListener('click', function(e) {
-        var btn = e.target.closest('.desktop-nav-btn');
+        const btn = e.target.closest('.desktop-nav-btn');
         if (btn) {
-          var route = btn.getAttribute('data-route');
+          const route = btn.getAttribute('data-route');
           if (route) window.location.hash = route;
         }
       });
@@ -49,27 +69,38 @@ const App = {
     }
   },
 
-  // Resolves the current hash, updates nav visibility and active state, then renders
+  /**
+   * Resolves the current hash, updates nav visibility and active state, then renders.
+   */
   route() {
     const hash = window.location.hash.slice(1) || 'welcome';
     App.currentRoute = hash;
 
     const nav = document.getElementById('bottom-nav');
-    const mainRoutes = ['dashboard', 'log', 'tips', 'profile'];
-
-    if (mainRoutes.includes(hash)) {
+    if (this.NAV_ROUTES.includes(hash)) {
       nav.classList.remove('hidden');
     } else {
       nav.classList.add('hidden');
     }
 
+    App._updateHeader(hash);
+    App._updateNavActive(hash);
+
+    if (App.screens[hash]) {
+      App.screens[hash]();
+    } else {
+      window.location.hash = 'welcome';
+    }
+  },
+
+  /**
+   * Updates the top header visibility and stat display based on current route.
+   * @param {string} hash - Current route hash
+   */
+  _updateHeader(hash) {
     const topHeader = document.getElementById('top-header');
     if (topHeader) {
-      if (hash === 'welcome') {
-        topHeader.hidden = true;
-      } else {
-        topHeader.hidden = false;
-      }
+      topHeader.hidden = (hash === 'welcome');
     }
 
     const headerStat = document.getElementById('header-stat');
@@ -81,11 +112,17 @@ const App = {
       } else if (profile && profile.baselineFootprint != null) {
         headerStat.textContent = profile.baselineFootprint + 't CO₂/yr';
       } else if (profile && profile.quizAnswers) {
-        var fp = EcoData.calculateBaselineFootprint(profile.quizAnswers);
+        const fp = EcoData.calculateBaselineFootprint(profile.quizAnswers);
         headerStat.textContent = fp + 't CO₂/yr';
       }
     }
+  },
 
+  /**
+   * Updates the active state on both bottom and desktop navigation buttons.
+   * @param {string} hash - Current route hash
+   */
+  _updateNavActive(hash) {
     document.querySelectorAll('.nav-btn, .desktop-nav-btn').forEach(function(btn) {
       if (btn.getAttribute('data-route') === hash) {
         btn.classList.add('active');
@@ -95,15 +132,11 @@ const App = {
         btn.removeAttribute('aria-current');
       }
     });
-
-    if (App.screens[hash]) {
-      App.screens[hash]();
-    } else {
-      window.location.hash = 'welcome';
-    }
   },
 
-  // Renders the full profile/settings page including eco score, badges, and settings controls
+  /**
+   * Renders the full profile/settings page including eco score, badges, and settings controls.
+   */
   renderProfile() {
     const main = document.getElementById('main-content');
     const profile = EcoStorage.getProfile();
@@ -117,21 +150,73 @@ const App = {
       footprint = EcoData.calculateBaselineFootprint(profile.quizAnswers);
     }
     const score = App.calculateEcoScore(footprint);
-
-    let scoreColor;
-    if (score >= 70) scoreColor = '#40916C';
-    else if (score >= 40) scoreColor = '#F4A261';
-    else scoreColor = '#E63946';
-
-    const circumference = 2 * Math.PI * 38;
-    const dashOffset = circumference - (score / 100) * circumference;
-
     const userName = (profile && profile.name) ? profile.name : 'Eco Warrior';
     const initial = userName.charAt(0).toUpperCase();
-
-    // Build badges HTML with new system
     const earnedCount = EcoData.badges.filter(function(b) { return App.hasBadge(b.id, profile); }).length;
 
+    main.innerHTML = '<div class="screen-profile" aria-label="Profile and settings">'
+      + '<h1 class="screen-title">Profile</h1>'
+      + App._buildProfileHero(userName, initial, footprint, score)
+      + App._buildProfileStats(streak, completedTips, totalLogs, earnedCount)
+      + App._buildBadgesSection(profile, earnedCount)
+      + App._buildSettingsSection(userName)
+      + '</div>';
+
+    App._bindProfileEvents();
+  },
+
+  /**
+   * Builds the profile hero card with avatar, name, and eco score ring.
+   * @param {string} userName - Display name
+   * @param {string} initial - First character of name
+   * @param {number} footprint - Annual footprint in tonnes
+   * @param {number} score - Eco score 0-100
+   * @returns {string} Hero card HTML string
+   */
+  _buildProfileHero(userName, initial, footprint, score) {
+    const ringHTML = EcoData.buildSVGRing({
+      radius: 34, strokeWidth: 6, ratio: score / 100, stroke: 'white',
+      trackStroke: 'rgba(255,255,255,0.25)', size: 80,
+      ariaLabel: 'Eco score: ' + score,
+      centerText: '' + score, subText: 'Eco Score',
+      textFill: 'white', subFill: 'rgba(255,255,255,0.8)',
+      fontSize: 18, subFontSize: 8
+    });
+
+    return '<div class="profile-hero">'
+      + '<div class="profile-avatar">' + initial + '</div>'
+      + '<div class="profile-hero-info">'
+      + '<h2 class="profile-hero-name">' + userName + '</h2>'
+      + '<p class="profile-hero-sub">' + footprint + 't CO\u2082/yr footprint</p>'
+      + '</div>'
+      + '<div class="profile-hero-score">' + ringHTML + '</div>'
+      + '</div>';
+  },
+
+  /**
+   * Builds the stats row HTML showing streak, tips, entries, and badges counts.
+   * @param {number} streak - Current day streak
+   * @param {number} completedTips - Number of tips completed
+   * @param {number} totalLogs - Total number of log entries
+   * @param {number} earnedCount - Number of badges earned
+   * @returns {string} Stats row HTML string
+   */
+  _buildProfileStats(streak, completedTips, totalLogs, earnedCount) {
+    return '<div class="profile-stats">'
+      + '<div class="profile-stat-item"><span class="profile-stat-num">' + streak + '</span><span class="profile-stat-label">Day Streak</span></div>'
+      + '<div class="profile-stat-item"><span class="profile-stat-num">' + completedTips + '</span><span class="profile-stat-label">Tips Done</span></div>'
+      + '<div class="profile-stat-item"><span class="profile-stat-num">' + totalLogs + '</span><span class="profile-stat-label">Entries</span></div>'
+      + '<div class="profile-stat-item"><span class="profile-stat-num">' + earnedCount + '</span><span class="profile-stat-label">Badges</span></div>'
+      + '</div>';
+  },
+
+  /**
+   * Builds the badges section HTML with earned/locked states.
+   * @param {Object} profile - User profile object
+   * @param {number} earnedCount - Number of badges earned
+   * @returns {string} Badges section HTML string
+   */
+  _buildBadgesSection(profile, earnedCount) {
     const badgesHTML = EcoData.badges.map(function(badge) {
       const earned = App.hasBadge(badge.id, profile);
       const cls = earned ? 'earned' : 'locked';
@@ -146,67 +231,24 @@ const App = {
         + '</div>';
     }).join('');
 
-    main.innerHTML = '<div class="screen-profile" aria-label="Profile and settings">'
-
-      + '<h1 class="screen-title">Profile</h1>'
-
-      // Hero card with avatar + score
-      + '<div class="profile-hero">'
-      + '<div class="profile-avatar">' + initial + '</div>'
-      + '<div class="profile-hero-info">'
-      + '<h2 class="profile-hero-name">' + userName + '</h2>'
-      + '<p class="profile-hero-sub">' + footprint + 't CO\u2082/yr footprint</p>'
-      + '</div>'
-      + '<div class="profile-hero-score">'
-      + '<svg role="img" aria-label="Eco score: ' + score + '" width="80" height="80" viewBox="0 0 80 80">'
-      + '<circle cx="40" cy="40" r="34" fill="none" stroke="rgba(255,255,255,0.25)" stroke-width="6"/>'
-      + '<circle cx="40" cy="40" r="34" fill="none"'
-      + ' stroke="white"'
-      + ' stroke-width="6"'
-      + ' stroke-dasharray="' + (2 * Math.PI * 34).toFixed(2) + '"'
-      + ' stroke-dashoffset="' + ((2 * Math.PI * 34) - (score / 100) * (2 * Math.PI * 34)).toFixed(2) + '"'
-      + ' stroke-linecap="round"'
-      + ' transform="rotate(-90 40 40)"/>'
-      + '<text x="40" y="38" text-anchor="middle" font-size="18" font-weight="800" fill="white">' + score + '</text>'
-      + '<text x="40" y="50" text-anchor="middle" font-size="8" fill="rgba(255,255,255,0.8)">Eco Score</text>'
-      + '</svg>'
-      + '</div>'
-      + '</div>'
-
-      // Stats row
-      + '<div class="profile-stats">'
-      + '<div class="profile-stat-item">'
-      + '<span class="profile-stat-num">' + streak + '</span>'
-      + '<span class="profile-stat-label">Day Streak</span>'
-      + '</div>'
-      + '<div class="profile-stat-item">'
-      + '<span class="profile-stat-num">' + completedTips + '</span>'
-      + '<span class="profile-stat-label">Tips Done</span>'
-      + '</div>'
-      + '<div class="profile-stat-item">'
-      + '<span class="profile-stat-num">' + totalLogs + '</span>'
-      + '<span class="profile-stat-label">Entries</span>'
-      + '</div>'
-      + '<div class="profile-stat-item">'
-      + '<span class="profile-stat-num">' + earnedCount + '</span>'
-      + '<span class="profile-stat-label">Badges</span>'
-      + '</div>'
-      + '</div>'
-
-      // Badges section
-      + '<div class="card mt-16">'
+    return '<div class="card mt-16">'
       + '<div class="profile-section-header">'
       + '<h2 class="card-title" style="margin-bottom:0;">Badges</h2>'
       + '<span class="badge-co2">' + earnedCount + '/' + EcoData.badges.length + ' earned</span>'
       + '</div>'
       + '<div class="profile-badges-list" aria-live="polite">' + badgesHTML + '</div>'
-      + '</div>'
+      + '</div>';
+  },
 
-      // Settings section
-      + '<div class="card mt-16">'
+  /**
+   * Builds the settings section HTML with name input, quiz retake, export, reset, and logout.
+   * @param {string} userName - Current display name
+   * @returns {string} Settings section HTML string
+   */
+  _buildSettingsSection(userName) {
+    return '<div class="card mt-16">'
       + '<h2 class="card-title">Settings</h2>'
       + '<div class="settings-list">'
-
       + '<div class="form-group">'
       + '<label class="form-label" for="profile-name-input">Your Name</label>'
       + '<div class="profile-name-row">'
@@ -216,26 +258,23 @@ const App = {
       + '<button id="btn-save-name" class="btn btn-primary" type="button" aria-label="Save name">Save</button>'
       + '</div>'
       + '</div>'
-
       + '<button id="btn-retake-quiz" class="btn btn-outline btn-block mt-16" type="button"'
       + ' aria-label="Retake the carbon footprint quiz">Retake Quiz</button>'
-
       + '<button id="btn-export" class="btn btn-outline btn-block mt-16" type="button"'
       + ' aria-label="Download your carbon footprint report as PDF">Download Report (PDF)</button>'
-
       + '<button id="btn-reset-data" class="btn btn-outline btn-block mt-16" type="button"'
       + ' style="color:var(--color-warning);border-color:var(--color-warning);"'
       + ' aria-label="Reset logs and tips data">Reset Data</button>'
-
       + '<button id="btn-logout" class="btn btn-danger btn-block mt-16" type="button"'
       + ' aria-label="Logout and clear all data">Logout</button>'
-
       + '</div>'
-      + '</div>'
-
       + '</div>';
+  },
 
-    // Save name handler
+  /**
+   * Binds all event listeners for the profile/settings page.
+   */
+  _bindProfileEvents() {
     document.getElementById('btn-save-name').addEventListener('click', function() {
       const input = document.getElementById('profile-name-input');
       const newName = input.value.trim();
@@ -245,23 +284,19 @@ const App = {
       App.showToast('Name saved!');
     });
 
-    // Retake quiz handler
     document.getElementById('btn-retake-quiz').addEventListener('click', function() {
       window.location.hash = 'quiz';
     });
 
-    // Export PDF report
     document.getElementById('btn-export').addEventListener('click', function() {
       App.exportPDFReport();
     });
 
-    // Reset Data — clears logs+tips but keeps profile
     document.getElementById('btn-reset-data').addEventListener('click', function() {
       App.showModal(
         'Reset Data?',
         'This will clear all your logged activities and tips progress. Your profile and quiz answers will be kept.',
-        'Reset',
-        'Cancel',
+        'Reset', 'Cancel',
         function() {
           EcoStorage.resetData();
           App.showToast('Data reset! Profile kept.');
@@ -270,13 +305,11 @@ const App = {
       );
     });
 
-    // Logout — clears everything
     document.getElementById('btn-logout').addEventListener('click', function() {
       App.showModal(
         'Logout?',
         'This will delete all your data including profile, logs, and quiz answers. You will need to start over.',
-        'Logout',
-        'Cancel',
+        'Logout', 'Cancel',
         function() {
           EcoStorage.resetAll();
           window.location.hash = 'welcome';
@@ -286,7 +319,9 @@ const App = {
     });
   },
 
-  // Generates a styled HTML report in a new window for print-to-PDF
+  /**
+   * Generates a styled HTML report in a new window for print-to-PDF.
+   */
   exportPDFReport() {
     const profile = EcoStorage.getProfile();
     if (!profile || !profile.quizAnswers) {
@@ -305,18 +340,35 @@ const App = {
     const breakdown = Dashboard.getCategoryBreakdown(profile);
     const today = new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' });
 
-    // Score color
-    var scoreColor = score >= 70 ? '#40916C' : score >= 40 ? '#F4A261' : '#E63946';
-    var scoreLabel = score >= 70 ? 'Excellent' : score >= 40 ? 'Moderate' : 'Needs Improvement';
+    const scoreLabel = score >= EcoData.SCORE_THRESHOLDS.GOOD ? 'Excellent'
+      : score >= EcoData.SCORE_THRESHOLDS.MODERATE ? 'Moderate' : 'Needs Improvement';
 
-    // Comparison
-    var indiaAvg = EcoData.benchmarks.india.value;
-    var globalAvg = EcoData.benchmarks.global.value;
-    var vsIndia = footprint <= indiaAvg ? 'Below' : 'Above';
-    var vsGlobal = footprint <= globalAvg ? 'Below' : 'Above';
+    const html = App._buildPDFHTML({
+      userName, footprint, score, scoreLabel, streak, logs, completedTips, breakdown, today, qa
+    });
 
-    // Breakdown rows
-    var breakdownRows = breakdown.map(function(cat) {
+    const win = window.open('', '_blank');
+    if (!win) {
+      App.showToast('Please allow popups to download the report.', 'error');
+      return;
+    }
+    win.document.write(html);
+    win.document.close();
+    setTimeout(function() { win.print(); }, 400);
+  },
+
+  /**
+   * Builds the complete PDF report HTML document.
+   * @param {Object} data - Report data containing all fields needed for the PDF
+   * @returns {string} Complete HTML document string for the report
+   */
+  _buildPDFHTML(data) {
+    const indiaAvg = EcoData.benchmarks.india.value;
+    const globalAvg = EcoData.benchmarks.global.value;
+    const vsIndia = data.footprint <= indiaAvg ? 'Below' : 'Above';
+    const vsGlobal = data.footprint <= globalAvg ? 'Below' : 'Above';
+
+    const breakdownRows = data.breakdown.map(function(cat) {
       return '<tr>'
         + '<td style="padding:8px 12px;">' + (EcoData.categoryIcons[cat.key] || '') + ' ' + cat.label + '</td>'
         + '<td style="padding:8px 12px;text-align:right;font-weight:600;">' + Math.round(cat.value) + ' kg</td>'
@@ -324,17 +376,16 @@ const App = {
         + '</tr>';
     }).join('');
 
-    // Quiz answers readable
-    var transportLabel = EcoData.emissionFactors.transport[qa.transport] ? EcoData.emissionFactors.transport[qa.transport].label : qa.transport;
-    var foodLabel = EcoData.emissionFactors.food[qa.food] ? EcoData.emissionFactors.food[qa.food].label : qa.food;
-    var energyLabel = EcoData.emissionFactors.energy[qa.energy] ? EcoData.emissionFactors.energy[qa.energy].label : qa.energy;
-    var shoppingLabel = EcoData.emissionFactors.shopping[qa.shopping] ? EcoData.emissionFactors.shopping[qa.shopping].label : qa.shopping;
+    const qa = data.qa;
+    const transportLabel = EcoData.emissionFactors.transport[qa.transport] ? EcoData.emissionFactors.transport[qa.transport].label : qa.transport;
+    const foodLabel = EcoData.emissionFactors.food[qa.food] ? EcoData.emissionFactors.food[qa.food].label : qa.food;
+    const energyLabel = EcoData.emissionFactors.energy[qa.energy] ? EcoData.emissionFactors.energy[qa.energy].label : qa.energy;
+    const shoppingLabel = EcoData.emissionFactors.shopping[qa.shopping] ? EcoData.emissionFactors.shopping[qa.shopping].label : qa.shopping;
 
-    // Recent logs (last 10)
-    var recentLogs = logs.slice(0, 10);
-    var logsRows = recentLogs.map(function(log) {
-      var actData = EcoData.emissionFactors[log.category] && EcoData.emissionFactors[log.category][log.activity];
-      var actLabel = actData ? actData.label : log.activity;
+    const recentLogs = data.logs.slice(0, 10);
+    const logsRows = recentLogs.map(function(log) {
+      const actData = EcoData.emissionFactors[log.category] && EcoData.emissionFactors[log.category][log.activity];
+      const actLabel = actData ? actData.label : log.activity;
       return '<tr>'
         + '<td style="padding:6px 12px;">' + log.date + '</td>'
         + '<td style="padding:6px 12px;">' + (EcoData.categoryIcons[log.category] || '') + ' ' + actLabel + '</td>'
@@ -343,24 +394,22 @@ const App = {
         + '</tr>';
     }).join('');
 
-    // Badges earned
-    var earnedBadges = EcoData.badges.filter(function(b) { return App.hasBadge(b.id, profile); });
-    var badgesHTML = earnedBadges.length > 0
+    const earnedBadges = EcoData.badges.filter(function(b) { return App.hasBadge(b.id, EcoStorage.getProfile()); });
+    const badgesHTML = earnedBadges.length > 0
       ? earnedBadges.map(function(b) {
         return '<span style="display:inline-block;background:#d4edda;border-radius:20px;padding:6px 14px;margin:4px;font-size:13px;">'
           + b.icon + ' ' + b.name + '</span>';
       }).join('')
       : '<p style="color:#6C757D;">No badges earned yet. Keep going!</p>';
 
-    // Tips suggestions based on highest category
-    var topCategory = breakdown[0];
-    var categoryTips = EcoData.tips.filter(function(t) { return t.category === topCategory.key; }).slice(0, 3);
-    var tipsHTML = categoryTips.map(function(t) {
+    const topCategory = data.breakdown[0];
+    const categoryTips = EcoData.tips.filter(function(t) { return t.category === topCategory.key; }).slice(0, 3);
+    const tipsHTML = categoryTips.map(function(t) {
       return '<li style="margin-bottom:8px;"><strong>' + t.title + '</strong> — ' + t.description + ' <em>(' + t.savings + ')</em></li>';
     }).join('');
 
-    var html = '<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8">'
-      + '<title>EcoTrack Report - ' + userName + '</title>'
+    return '<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8">'
+      + '<title>EcoTrack Report - ' + data.userName + '</title>'
       + '<style>'
       + 'body{font-family:system-ui,-apple-system,sans-serif;color:#1A1A2E;max-width:800px;margin:0 auto;padding:40px 30px;line-height:1.6;}'
       + '.header{text-align:center;margin-bottom:30px;padding-bottom:20px;border-bottom:3px solid #2D6A4F;}'
@@ -383,49 +432,37 @@ const App = {
       + '.footer{text-align:center;margin-top:40px;padding-top:16px;border-top:2px solid #e0e0e0;color:#6C757D;font-size:12px;}'
       + '@media print{body{padding:20px;}}'
       + '</style></head><body>'
-
-      // Header
       + '<div class="header">'
       + '<h1>EcoTrack Carbon Footprint Report</h1>'
-      + '<p><strong>' + userName + '</strong> &bull; Generated on ' + today + '</p>'
+      + '<p><strong>' + data.userName + '</strong> &bull; Generated on ' + data.today + '</p>'
       + '</div>'
-
-      // Eco Score
       + '<div class="score-box">'
-      + '<div class="score-num">' + score + '<span style="font-size:24px;">/100</span></div>'
-      + '<div class="score-label">Eco Score &mdash; ' + scoreLabel + '</div>'
-      + '<p style="margin-top:12px;font-size:32px;font-weight:700;">' + footprint + ' tonnes CO&#8322;/year</p>'
+      + '<div class="score-num">' + data.score + '<span style="font-size:24px;">/100</span></div>'
+      + '<div class="score-label">Eco Score &mdash; ' + data.scoreLabel + '</div>'
+      + '<p style="margin-top:12px;font-size:32px;font-weight:700;">' + data.footprint + ' tonnes CO&#8322;/year</p>'
       + '</div>'
-
-      // Stats
       + '<div class="stats-row">'
-      + '<div class="stat-box"><span class="stat-num">' + streak + '</span><span class="stat-lbl">Day Streak</span></div>'
-      + '<div class="stat-box"><span class="stat-num">' + completedTips + '</span><span class="stat-lbl">Tips Done</span></div>'
-      + '<div class="stat-box"><span class="stat-num">' + logs.length + '</span><span class="stat-lbl">Total Entries</span></div>'
+      + '<div class="stat-box"><span class="stat-num">' + data.streak + '</span><span class="stat-lbl">Day Streak</span></div>'
+      + '<div class="stat-box"><span class="stat-num">' + data.completedTips + '</span><span class="stat-lbl">Tips Done</span></div>'
+      + '<div class="stat-box"><span class="stat-num">' + data.logs.length + '</span><span class="stat-lbl">Total Entries</span></div>'
       + '<div class="stat-box"><span class="stat-num">' + earnedBadges.length + '</span><span class="stat-lbl">Badges</span></div>'
       + '</div>'
-
-      // Comparison
       + '<h2>How You Compare</h2>'
       + '<div class="compare-row">'
-      + '<div class="compare-item" style="background:' + (footprint <= indiaAvg ? '#d4edda' : '#ffeeba') + ';">'
+      + '<div class="compare-item" style="background:' + (data.footprint <= indiaAvg ? '#d4edda' : '#ffeeba') + ';">'
       + '<p style="font-size:13px;margin:0;color:#6C757D;">vs India Average</p>'
       + '<p style="font-size:22px;font-weight:700;margin:4px 0;">' + vsIndia + '</p>'
       + '<p style="font-size:12px;margin:0;">India avg: ' + indiaAvg + 't CO&#8322;/yr</p>'
       + '</div>'
-      + '<div class="compare-item" style="background:' + (footprint <= globalAvg ? '#d4edda' : '#ffeeba') + ';">'
+      + '<div class="compare-item" style="background:' + (data.footprint <= globalAvg ? '#d4edda' : '#ffeeba') + ';">'
       + '<p style="font-size:13px;margin:0;color:#6C757D;">vs Global Average</p>'
       + '<p style="font-size:22px;font-weight:700;margin:4px 0;">' + vsGlobal + '</p>'
       + '<p style="font-size:12px;margin:0;">Global avg: ' + globalAvg + 't CO&#8322;/yr</p>'
       + '</div>'
       + '</div>'
-
-      // Category Breakdown
       + '<h2>Emission Breakdown by Category</h2>'
       + '<table><thead><tr><th>Category</th><th style="text-align:right;">Emissions</th><th style="text-align:right;">Share</th></tr></thead>'
       + '<tbody>' + breakdownRows + '</tbody></table>'
-
-      // Your Lifestyle
       + '<h2>Your Lifestyle Choices</h2>'
       + '<table><thead><tr><th>Category</th><th style="text-align:right;">Your Choice</th></tr></thead><tbody>'
       + '<tr><td style="padding:8px 12px;">Transport</td><td style="padding:8px 12px;text-align:right;">' + transportLabel + ' (' + (qa.dailyKm || 0) + ' km/day)</td></tr>'
@@ -434,50 +471,42 @@ const App = {
       + '<tr style="background:#F0F7F4;"><td style="padding:8px 12px;">Shopping</td><td style="padding:8px 12px;text-align:right;">' + shoppingLabel + '</td></tr>'
       + '<tr><td style="padding:8px 12px;">Flights</td><td style="padding:8px 12px;text-align:right;">' + (qa.flightsPerYear || 0) + ' domestic, ' + (qa.intlFlightsPerYear || 0) + ' international/yr</td></tr>'
       + '</tbody></table>'
-
-      // Badges
       + '<h2>Badges Earned</h2>'
       + badgesHTML
-
-      // Top Recommendations
       + '<h2>Top Recommendations for You</h2>'
       + '<p style="color:#6C757D;font-size:13px;">Based on your highest category: <strong>' + topCategory.label + '</strong></p>'
       + '<ol style="padding-left:20px;">' + tipsHTML + '</ol>'
-
-      // Recent Activity
       + (recentLogs.length > 0
         ? '<h2>Recent Activity Log</h2>'
           + '<table><thead><tr><th>Date</th><th>Activity</th><th style="text-align:right;">Qty</th><th style="text-align:right;">CO&#8322;</th></tr></thead>'
           + '<tbody>' + logsRows + '</tbody></table>'
         : '')
-
-      // Footer
       + '<div class="footer">'
       + '<p>Generated by <strong>EcoTrack</strong> &mdash; Understand, Track & Reduce Your Carbon Footprint</p>'
       + '<p>Data sources: EPA, DEFRA, IPCC AR6, WRI India, ICAO, IEA, Our World in Data</p>'
       + '</div>'
-
       + '</body></html>';
-
-    var win = window.open('', '_blank');
-    if (!win) {
-      App.showToast('Please allow popups to download the report.', 'error');
-      return;
-    }
-    win.document.write(html);
-    win.document.close();
-    setTimeout(function() { win.print(); }, 400);
   },
 
-  // Converts a footprint in tonnes CO2 to a 0-100 eco score where lower emissions = higher score
+  /**
+   * Converts a footprint in tonnes CO2 to a 0-100 eco score where lower emissions = higher score.
+   * @param {number} footprintTonnes - Annual carbon footprint in tonnes CO2
+   * @returns {number} Eco score between 5 and 100
+   */
   calculateEcoScore(footprintTonnes) {
-    if (footprintTonnes <= 0.5) return 100;
-    if (footprintTonnes >= 10) return 5;
-    const score = Math.round(100 - (footprintTonnes / 10) * 95);
-    return Math.max(5, Math.min(100, score));
+    const { MAX_SCORE, MIN_SCORE, LOW_FOOTPRINT, HIGH_FOOTPRINT } = this.ECO_SCORE;
+    if (footprintTonnes <= LOW_FOOTPRINT) return MAX_SCORE;
+    if (footprintTonnes >= HIGH_FOOTPRINT) return MIN_SCORE;
+    const score = Math.round(MAX_SCORE - (footprintTonnes / HIGH_FOOTPRINT) * (MAX_SCORE - MIN_SCORE));
+    return Math.max(MIN_SCORE, Math.min(MAX_SCORE, score));
   },
 
-  // Returns true if the user has earned a specific badge
+  /**
+   * Returns true if the user has earned a specific badge based on their profile and activity data.
+   * @param {string} badgeId - The badge identifier to check
+   * @param {Object|null} profile - User profile object (may be null for non-quiz badges)
+   * @returns {boolean} Whether the badge has been earned
+   */
   hasBadge(badgeId, profile) {
     const ef = EcoData.emissionFactors;
     const qa = (profile && profile.quizAnswers) ? profile.quizAnswers : null;
@@ -489,21 +518,21 @@ const App = {
     // Quiz-based badges
     if (badgeId === 'badge_commuter' && qa) {
       const factor = ef.transport[qa.transport] ? ef.transport[qa.transport].factor : 0;
-      return (factor * (qa.dailyKm || 0) * 365) < 500;
+      return (factor * (qa.dailyKm || 0) * EcoData.DAYS_PER_YEAR) < this.BADGE_THRESHOLDS.TRANSPORT;
     }
     if (badgeId === 'badge_eater' && qa) {
       const factor = ef.food[qa.food] ? ef.food[qa.food].factor : 0;
-      return (factor * 365) < 800;
+      return (factor * EcoData.DAYS_PER_YEAR) < this.BADGE_THRESHOLDS.FOOD;
     }
     if (badgeId === 'badge_saver' && qa) {
       const factor = ef.energy[qa.energy] ? ef.energy[qa.energy].factor : 0;
-      return (factor * (qa.monthlyKwh || 0) * 12) < 500;
+      return (factor * (qa.monthlyKwh || 0) * EcoData.MONTHS_PER_YEAR) < this.BADGE_THRESHOLDS.ENERGY;
     }
     if (badgeId === 'badge_shopper' && qa) {
       return qa.shopping === 'minimal';
     }
     if (badgeId === 'badge_leader' && qa) {
-      return EcoData.calculateBaselineFootprint(qa) < 1.9;
+      return EcoData.calculateBaselineFootprint(qa) < EcoData.FOOTPRINT_THRESHOLDS.INDIA_AVG;
     }
 
     // Streak-based badges
@@ -522,9 +551,17 @@ const App = {
     return false;
   },
 
-  // Shows a custom confirmation modal with title, message, and confirm/cancel actions
+  /**
+   * Shows a custom confirmation modal with title, message, and confirm/cancel actions.
+   * @param {string} title - Modal title text
+   * @param {string} message - Modal body message
+   * @param {string} confirmText - Text for the confirm button
+   * @param {string} cancelText - Text for the cancel button
+   * @param {Function} onConfirm - Callback invoked when confirm is clicked
+   * @param {boolean} [isDanger=false] - Whether to style the confirm button as dangerous
+   */
   showModal(title, message, confirmText, cancelText, onConfirm, isDanger) {
-    var overlay = document.createElement('div');
+    const overlay = document.createElement('div');
     overlay.className = 'modal-overlay';
     overlay.innerHTML = '<div class="modal-card">'
       + '<h2 class="modal-title">' + title + '</h2>'
@@ -548,7 +585,11 @@ const App = {
     });
   },
 
-  // Creates and displays a temporary toast notification, then removes it after 2500ms
+  /**
+   * Creates and displays a temporary toast notification, then removes it after TOAST_DURATION ms.
+   * @param {string} message - Toast message text
+   * @param {string} [type='success'] - Toast type: 'success' or 'error'
+   */
   showToast(message, type) {
     const toastType = type || 'success';
     const toast = document.createElement('div');
@@ -563,11 +604,12 @@ const App = {
       toast.classList.remove('show');
       setTimeout(function() {
         if (toast.parentNode) toast.parentNode.removeChild(toast);
-      }, 300);
-    }, 2500);
+      }, App.TOAST_FADE_MS);
+    }, App.TOAST_DURATION);
   }
 };
 
+/** Initialize the app when the DOM is fully loaded */
 document.addEventListener('DOMContentLoaded', function() {
   if (!window.__ECOTRACK_TEST_MODE__) App.init();
 });

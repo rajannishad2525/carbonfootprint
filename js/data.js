@@ -1,7 +1,33 @@
-// EcoData: Central data module for emission factors, benchmarks, tips, and badges
+/**
+ * EcoData: Central data module for emission factors, benchmarks, tips, and badges.
+ * All emission factors are sourced from peer-reviewed research and government publications.
+ * @namespace
+ */
 const EcoData = {
 
-  // Emission factors grouped by category with source citations
+  // ─── CONSTANTS ──────────────────────────────────────────────────────────────
+
+  /** Scoring thresholds for eco score color coding */
+  SCORE_THRESHOLDS: { GOOD: 70, MODERATE: 40 },
+
+  /** Footprint thresholds (tonnes CO2/yr) for comparison badges */
+  FOOTPRINT_THRESHOLDS: { INDIA_AVG: 1.9, GLOBAL_AVG: 4.7, MAX_DISPLAY: 12 },
+
+  /** SVG ring circumference for a circle of given radius */
+  SVG_RING: { QUIZ_RADIUS: 42, QUIZ_CIRCUMFERENCE: 2 * Math.PI * 42 },
+
+  /** Days in a year, used for annualizing daily emission factors */
+  DAYS_PER_YEAR: 365,
+
+  /** Months in a year, used for annualizing monthly energy usage */
+  MONTHS_PER_YEAR: 12,
+
+  /** Conversion factor from tonnes to kg */
+  KG_PER_TONNE: 1000,
+
+  // ─── EMISSION FACTORS ───────────────────────────────────────────────────────
+
+  /** Emission factors grouped by category with source citations */
   emissionFactors: {
     transport: {
       car:        { factor: 0.174,  unit: 'kgCO2/km', source: 'EPA 2024',           label: 'Car (Petrol)' },
@@ -47,13 +73,13 @@ const EcoData = {
     }
   },
 
-  // Reference benchmarks for comparison
+  /** Reference benchmarks for comparison */
   benchmarks: {
     india:  { value: 1.9, unit: 'tonnes CO2/year', source: 'World Bank',        label: 'Average Indian' },
     global: { value: 4.7, unit: 'tonnes CO2/year', source: 'Our World in Data', label: 'Global Average' }
   },
 
-  // Icons for each emission category
+  /** Icons for each emission category */
   categoryIcons: {
     transport: '🚗',
     food:      '🍽️',
@@ -62,7 +88,7 @@ const EcoData = {
     lifestyle: '🎯'
   },
 
-  // Human-readable labels for each emission category
+  /** Human-readable labels for each emission category */
   categoryLabels: {
     transport: 'Transport',
     food:      'Food & Diet',
@@ -71,7 +97,89 @@ const EcoData = {
     lifestyle: 'Lifestyle'
   },
 
-  // Calculates emission in kg CO2 for a given category, activity, and quantity
+  /**
+   * Returns the semantic color CSS variable for a given footprint value.
+   * @param {number} footprint - Annual footprint in tonnes CO2
+   * @returns {string} CSS color variable string
+   */
+  getFootprintColor(footprint) {
+    if (footprint <= this.FOOTPRINT_THRESHOLDS.INDIA_AVG) return 'var(--color-success)';
+    if (footprint <= this.FOOTPRINT_THRESHOLDS.GLOBAL_AVG) return 'var(--color-warning)';
+    return 'var(--color-danger)';
+  },
+
+  /**
+   * Returns the semantic color CSS variable for a given eco score.
+   * @param {number} score - Eco score between 0 and 100
+   * @returns {string} CSS color variable string
+   */
+  getScoreColor(score) {
+    if (score >= this.SCORE_THRESHOLDS.GOOD) return 'var(--color-success)';
+    if (score >= this.SCORE_THRESHOLDS.MODERATE) return 'var(--color-warning)';
+    return 'var(--color-danger)';
+  },
+
+  /**
+   * Returns the hex color for a given eco score (used in profile and PDF).
+   * @param {number} score - Eco score between 0 and 100
+   * @returns {string} Hex color string
+   */
+  getScoreHex(score) {
+    if (score >= this.SCORE_THRESHOLDS.GOOD) return '#40916C';
+    if (score >= this.SCORE_THRESHOLDS.MODERATE) return '#F4A261';
+    return '#E63946';
+  },
+
+  /**
+   * Builds an SVG progress ring element as an HTML string.
+   * @param {Object} options - Ring configuration
+   * @param {number} options.radius - Circle radius in SVG units
+   * @param {number} options.strokeWidth - Stroke width in SVG units
+   * @param {number} options.ratio - Fill ratio between 0 and 1
+   * @param {string} options.stroke - Stroke color (CSS value)
+   * @param {string} options.trackStroke - Track circle stroke color
+   * @param {number} options.size - SVG width/height in pixels
+   * @param {string} options.ariaLabel - Accessible label for the ring
+   * @param {string} options.centerText - Main text in the center
+   * @param {string} options.subText - Smaller text below center
+   * @param {string} [options.textFill] - Fill color for center text
+   * @param {string} [options.subFill] - Fill color for sub text
+   * @param {number} [options.fontSize] - Font size for center text
+   * @param {number} [options.subFontSize] - Font size for sub text
+   * @returns {string} SVG element as HTML string
+   */
+  buildSVGRing(options) {
+    const cx = options.size / 2;
+    const cy = options.size / 2;
+    const circumference = 2 * Math.PI * options.radius;
+    const dashOffset = circumference - options.ratio * circumference;
+    const textFill = options.textFill || 'var(--color-text)';
+    const subFill = options.subFill || 'var(--color-neutral)';
+    const fontSize = options.fontSize || 18;
+    const subFontSize = options.subFontSize || 9;
+
+    return '<svg role="img" aria-label="' + options.ariaLabel + '" width="' + options.size + '" height="' + options.size
+      + '" viewBox="0 0 ' + options.size + ' ' + options.size + '">'
+      + '<circle cx="' + cx + '" cy="' + cy + '" r="' + options.radius + '" fill="none" stroke="' + options.trackStroke + '" stroke-width="' + options.strokeWidth + '"/>'
+      + '<circle cx="' + cx + '" cy="' + cy + '" r="' + options.radius + '" fill="none"'
+      + ' stroke="' + options.stroke + '"'
+      + ' stroke-width="' + options.strokeWidth + '"'
+      + ' stroke-dasharray="' + circumference.toFixed(2) + '"'
+      + ' stroke-dashoffset="' + dashOffset.toFixed(2) + '"'
+      + ' stroke-linecap="round"'
+      + ' transform="rotate(-90 ' + cx + ' ' + cy + ')"/>'
+      + '<text x="' + cx + '" y="' + (cy - 4) + '" text-anchor="middle" font-size="' + fontSize + '" font-weight="800" fill="' + textFill + '">' + options.centerText + '</text>'
+      + '<text x="' + cx + '" y="' + (cy + subFontSize + 3) + '" text-anchor="middle" font-size="' + subFontSize + '" fill="' + subFill + '">' + options.subText + '</text>'
+      + '</svg>';
+  },
+
+  /**
+   * Calculates emission in kg CO2 for a given category, activity, and quantity.
+   * @param {string} category - Emission category key (e.g. 'transport')
+   * @param {string} activity - Activity key within the category (e.g. 'car')
+   * @param {number} quantity - Amount of the activity performed
+   * @returns {number} Emission in kg CO2, rounded to 2 decimal places
+   */
   calculateEmission(category, activity, quantity) {
     const cat = this.emissionFactors[category];
     if (!cat) return 0;
@@ -80,40 +188,53 @@ const EcoData = {
     return Math.round(act.factor * quantity * 100) / 100;
   },
 
-  // Calculates annual carbon footprint in tonnes CO2 from quiz answers
+  /**
+   * Calculates annual carbon footprint in tonnes CO2 from quiz answers.
+   * @param {Object} quizAnswers - Flattened quiz answers object
+   * @param {string} quizAnswers.transport - Transport mode key
+   * @param {number} quizAnswers.dailyKm - Daily commute distance in km
+   * @param {string} quizAnswers.food - Diet type key
+   * @param {string} quizAnswers.energy - Energy source key
+   * @param {number} quizAnswers.monthlyKwh - Monthly electricity usage in kWh
+   * @param {string} quizAnswers.shopping - Shopping level key
+   * @param {number} quizAnswers.flightsPerYear - Number of domestic flights per year
+   * @param {number} [quizAnswers.intlFlightsPerYear] - Number of international flights per year
+   * @param {number} [quizAnswers.streamingHours] - Daily streaming hours
+   * @returns {number} Annual footprint in tonnes CO2, rounded to 1 decimal place
+   */
   calculateBaselineFootprint(quizAnswers) {
     const ef = this.emissionFactors;
 
     const transportFactor = ef.transport[quizAnswers.transport]
       ? ef.transport[quizAnswers.transport].factor
       : 0;
-    const transportKg = transportFactor * (quizAnswers.dailyKm || 0) * 365;
+    const transportKg = transportFactor * (quizAnswers.dailyKm || 0) * this.DAYS_PER_YEAR;
 
     const foodFactor = ef.food[quizAnswers.food]
       ? ef.food[quizAnswers.food].factor
       : 0;
-    const foodKg = foodFactor * 365;
+    const foodKg = foodFactor * this.DAYS_PER_YEAR;
 
     const energyFactor = ef.energy[quizAnswers.energy]
       ? ef.energy[quizAnswers.energy].factor
       : 0;
-    const energyKg = energyFactor * (quizAnswers.monthlyKwh || 0) * 12;
+    const energyKg = energyFactor * (quizAnswers.monthlyKwh || 0) * this.MONTHS_PER_YEAR;
 
     const shoppingFactor = ef.shopping[quizAnswers.shopping]
       ? ef.shopping[quizAnswers.shopping].factor
       : 0;
-    const shoppingKg = shoppingFactor * 1000;
+    const shoppingKg = shoppingFactor * this.KG_PER_TONNE;
 
     const flightKg = ef.lifestyle.flight.factor * (quizAnswers.flightsPerYear || 0);
     const intlFlightKg = ef.lifestyle.intlFlight.factor * (quizAnswers.intlFlightsPerYear || 0);
-    const streamingKg = ef.lifestyle.streaming.factor * (quizAnswers.streamingHours || 0) * 365;
+    const streamingKg = ef.lifestyle.streaming.factor * (quizAnswers.streamingHours || 0) * this.DAYS_PER_YEAR;
     const lifestyleKg = flightKg + intlFlightKg + streamingKg;
 
     const totalKg = transportKg + foodKg + energyKg + shoppingKg + lifestyleKg;
     return Math.round(totalKg / 100) / 10;
   },
 
-  // Actionable tips for reducing carbon footprint across all categories
+  /** Actionable tips for reducing carbon footprint across all categories */
   tips: [
     {
       id: 'tip_transport_1',
@@ -342,7 +463,7 @@ const EcoData = {
     }
   ],
 
-  // Achievement badges awarded for hitting sustainability milestones
+  /** Achievement badges awarded for hitting sustainability milestones */
   badges: [
     {
       id: 'badge_commuter',

@@ -1,11 +1,25 @@
-// TestRunner: Lightweight browser-based test runner with assertion helpers
+/**
+ * TestRunner: Lightweight browser-based test runner with assertion helpers.
+ * Runs all unit tests automatically on load and renders results to the DOM.
+ * @namespace
+ */
 const TestRunner = {
 
+  /** Stores individual test results */
   results: [],
+
+  /** Count of passed tests */
   passCount: 0,
+
+  /** Count of failed tests */
   failCount: 0,
 
-  // Asserts that two values are strictly equal using ===
+  /**
+   * Asserts that two values are strictly equal using ===.
+   * @param {*} actual - The actual value
+   * @param {*} expected - The expected value
+   * @param {string} message - Test description
+   */
   assertEqual(actual, expected, message) {
     if (actual === expected) {
       this._record(true, message);
@@ -14,7 +28,11 @@ const TestRunner = {
     }
   },
 
-  // Asserts that a value is strictly true
+  /**
+   * Asserts that a value is strictly true.
+   * @param {*} value - The value to check
+   * @param {string} message - Test description
+   */
   assertTrue(value, message) {
     if (value === true) {
       this._record(true, message);
@@ -23,7 +41,11 @@ const TestRunner = {
     }
   },
 
-  // Asserts that a value is strictly false
+  /**
+   * Asserts that a value is strictly false.
+   * @param {*} value - The value to check
+   * @param {string} message - Test description
+   */
   assertFalse(value, message) {
     if (value === false) {
       this._record(true, message);
@@ -32,7 +54,12 @@ const TestRunner = {
     }
   },
 
-  // Asserts that calling fn() throws any error (or one whose message contains expectedMsg)
+  /**
+   * Asserts that calling fn() throws any error (or one whose message contains expectedMsg).
+   * @param {Function} fn - Function expected to throw
+   * @param {string} message - Test description
+   * @param {string} [expectedMsg] - Optional substring to match in error message
+   */
   assertThrows(fn, message, expectedMsg) {
     try {
       fn();
@@ -46,7 +73,13 @@ const TestRunner = {
     }
   },
 
-  // Asserts that actual is within tolerance of expected (for floating-point comparisons)
+  /**
+   * Asserts that actual is within tolerance of expected (for floating-point comparisons).
+   * @param {number} actual - The actual numeric value
+   * @param {number} expected - The expected numeric value
+   * @param {number} tolerance - Acceptable deviation
+   * @param {string} message - Test description
+   */
   assertClose(actual, expected, tolerance, message) {
     if (Math.abs(actual - expected) <= tolerance) {
       this._record(true, message);
@@ -56,7 +89,12 @@ const TestRunner = {
     }
   },
 
-  // Records a single test result in the results array and increments the appropriate counter
+  /**
+   * Records a single test result in the results array and increments the appropriate counter.
+   * @param {boolean} passed - Whether the test passed
+   * @param {string} name - Test name/description
+   * @param {string|null} [errorMessage] - Error details if failed
+   */
   _record(passed, name, errorMessage) {
     this.results.push({ passed: passed, name: name, error: errorMessage || null });
     if (passed) {
@@ -66,13 +104,17 @@ const TestRunner = {
     }
   },
 
-  // Runs all defined tests and renders results to the DOM
+  /**
+   * Runs all defined tests and renders results to the DOM.
+   */
   run() {
     this._runAllTests();
     this._renderResults();
   },
 
-  // Contains all test cases grouped by module
+  /**
+   * Contains all test cases grouped by module.
+   */
   _runAllTests() {
 
     // ─── DATA MODULE TESTS ───────────────────────────────────────────────────
@@ -297,7 +339,7 @@ const TestRunner = {
     );
 
     // Test: getCategoryBreakdown returns 5 categories
-    var mockProfile = {
+    const mockProfile = {
       quizAnswers: {
         transport: 'car',
         dailyKm: 20,
@@ -311,7 +353,7 @@ const TestRunner = {
       baselineFootprint: 4.2
     };
 
-    var breakdown = Dashboard.getCategoryBreakdown(mockProfile);
+    const breakdown = Dashboard.getCategoryBreakdown(mockProfile);
     this.assertEqual(breakdown.length, 5, 'CategoryBreakdown: returns 5 categories');
 
     // Test: percentages are valid
@@ -321,7 +363,7 @@ const TestRunner = {
     );
 
     // Test: percentages sum to approximately 100
-    var totalPct = breakdown.reduce(function(sum, c) { return sum + c.percentage; }, 0);
+    const totalPct = breakdown.reduce(function(sum, c) { return sum + c.percentage; }, 0);
     this.assertClose(totalPct, 100, 5, 'CategoryBreakdown: percentages sum to ~100');
 
     // Test: Badge check - heavy car commuter should NOT earn Green Commuter
@@ -331,7 +373,7 @@ const TestRunner = {
     );
 
     // Test: Low footprint profile earns badges
-    var lowFpProfile = {
+    const lowFpProfile = {
       quizAnswers: {
         transport: 'bike',
         dailyKm: 5,
@@ -365,7 +407,7 @@ const TestRunner = {
     EcoStorage.addLog({ category: 'transport', quantity: 5, date: '2025-06-17' });
     EcoStorage.completeTip('tip_transport_1');
     EcoStorage.resetData();
-    var profileAfterReset = EcoStorage.getProfile();
+    const profileAfterReset = EcoStorage.getProfile();
     this.assertTrue(
       profileAfterReset !== null && profileAfterReset.name === 'TestUser',
       'resetData: profile is preserved after data reset'
@@ -382,9 +424,9 @@ const TestRunner = {
 
     // Test: Streak badge with 3-day streak
     EcoStorage.resetAll();
-    var today = new Date();
-    for (var si = 0; si < 3; si++) {
-      var d = new Date(today);
+    const today = new Date();
+    for (let si = 0; si < 3; si++) {
+      const d = new Date(today);
       d.setDate(today.getDate() - si);
       EcoStorage.addLog({ category: 'transport', quantity: 5, date: d.toISOString().slice(0, 10) });
     }
@@ -393,7 +435,7 @@ const TestRunner = {
 
     // Test: Tips badge earned with 5 completed tips
     EcoStorage.resetAll();
-    for (var ti = 1; ti <= 5; ti++) {
+    for (let ti = 1; ti <= 5; ti++) {
       EcoStorage.completeTip('tip_test_' + ti);
     }
     this.assertTrue(App.hasBadge('badge_tips5', null), 'Badge: 5 completed tips earns Tip Explorer');
@@ -401,24 +443,42 @@ const TestRunner = {
 
     // Test: Activity badge earned with 10 logs
     EcoStorage.resetAll();
-    for (var li = 0; li < 10; li++) {
+    for (let li = 0; li < 10; li++) {
       EcoStorage.addLog({ category: 'transport', quantity: 5, date: '2025-06-17' });
     }
     this.assertTrue(App.hasBadge('badge_logger10', null), 'Badge: 10 logs earns Logger Pro');
     this.assertFalse(App.hasBadge('badge_logger50', null), 'Badge: 10 logs does not earn Data Champion');
 
     // Test: All badges have required fields
-    var badgeFields = ['id', 'name', 'icon', 'description', 'type'];
-    var allBadgesValid = EcoData.badges.every(function(b) {
+    const badgeFields = ['id', 'name', 'icon', 'description', 'type'];
+    const allBadgesValid = EcoData.badges.every(function(b) {
       return badgeFields.every(function(f) { return b[f] && typeof b[f] === 'string'; });
     });
     this.assertTrue(allBadgesValid, 'All badges have required fields (id, name, icon, description, type)');
+
+    // Test: Shared utility — buildSVGRing returns valid SVG string
+    const testRing = EcoData.buildSVGRing({
+      radius: 40, strokeWidth: 6, ratio: 0.5, stroke: 'green',
+      trackStroke: '#eee', size: 100, ariaLabel: 'Test ring',
+      centerText: '50', subText: 'test'
+    });
+    this.assertTrue(
+      testRing.indexOf('<svg') !== -1 && testRing.indexOf('</svg>') !== -1,
+      'buildSVGRing: returns valid SVG string'
+    );
+
+    // Test: getFootprintColor returns correct colors
+    this.assertEqual(EcoData.getFootprintColor(1.0), 'var(--color-success)', 'getFootprintColor: low footprint returns success color');
+    this.assertEqual(EcoData.getFootprintColor(3.0), 'var(--color-warning)', 'getFootprintColor: medium footprint returns warning color');
+    this.assertEqual(EcoData.getFootprintColor(6.0), 'var(--color-danger)', 'getFootprintColor: high footprint returns danger color');
 
     // Cleanup localStorage after all tests
     EcoStorage.resetAll();
   },
 
-  // Renders test results and summary counts into the DOM
+  /**
+   * Renders test results and summary counts into the DOM.
+   */
   _renderResults() {
     const total = this.passCount + this.failCount;
     document.getElementById('count-total').textContent = total;
