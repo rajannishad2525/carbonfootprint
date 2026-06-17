@@ -42,7 +42,7 @@ const App = {
     const quizDone = profile && profile.quizAnswers;
     const hash = window.location.hash;
 
-    if (!hash || hash === '#welcome') {
+    if (!hash) {
       window.location.hash = quizDone ? 'dashboard' : 'welcome';
     } else {
       App.route();
