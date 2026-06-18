@@ -1,6 +1,6 @@
 # EcoTrack — Carbon Footprint Tracker
 
-A smart web application that helps individuals **understand**, **track**, and **reduce** their carbon footprint through personalized insights and actionable tips.
+A smart web application that helps individuals **understand**, **track**, and **reduce** their personal carbon footprint through personalized insights and actionable tips.
 
 **Live Demo:** [https://eco.ystro.shop](https://eco.ystro.shop)
 
